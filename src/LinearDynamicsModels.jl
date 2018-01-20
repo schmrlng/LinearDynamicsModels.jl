@@ -73,9 +73,9 @@ function LinearQuadraticHelpers(A_::AbstractMatrix{T},
     x = collect(symbols(join(("x$i" for i in 1:Dx), " "), real=true))
     y = collect(symbols(join(("y$i" for i in 1:Dx), " "), real=true))
 
-    expAt = expm(A*t)
-    expAs = expm(A*s)
-    expAt_s = expm(A*(t - s))
+    expAt = exp(A*t)
+    expAs = exp(A*s)
+    expAt_s = exp(A*(t - s))
     G = integrate(expAt*B*inv(R)*B'*expAt', t)
     Ginv = inv(G)
     cdrift = integrate(expAt, t)*c
