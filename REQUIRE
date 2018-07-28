@@ -1,5 +1,6 @@
-julia 0.6
-StaticArrays
+julia 0.7-beta
+StaticArrays 0.8.2
 DifferentialDynamicsModels
-SymPy
-MacroTools
+ForwardDiff 0.8.0
+SymPy 0.7.0
+MacroTools 0.4.2
