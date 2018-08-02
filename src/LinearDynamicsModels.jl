@@ -1,5 +1,3 @@
-__precompile__()
-
 module LinearDynamicsModels
 
 using LinearAlgebra
@@ -36,7 +34,7 @@ function propagate(f::LinearDynamics{Dx,Du}, x::StaticVector{Dx}, RC::RampContro
     y = f.B*RC.uf + f.c
     eᴬᵗ, ∫eᴬᵗy = integrate_expAt_B(f.A, y, RC.t)
     z = f.B*(RC.u0 - RC.uf)
-    _, _, ∫eᴬᵗztdt⁻¹ = integrate_expAt_Bt(f.A, z. RC.t)
+    _, _, ∫eᴬᵗztdt⁻¹ = integrate_expAt_Bt_dtinv(f.A, z, RC.t)
     eᴬᵗ*x + ∫eᴬᵗy + ∫eᴬᵗztdt⁻¹
 end # @test propagate(f, x, RC) ≈ linearize(f, x, RC)(x, RC)
 
@@ -48,7 +46,7 @@ function NIntegratorDynamics(::Val{N}, ::Val{D}, ::Type{T} = Rational{Int}) wher
     A = diagm(Val(D) => ones(SVector{(N-1)*D,T}))
     B = [zeros(SMatrix{(N-1)*D,D,T}); SMatrix{D,D,T}(I)]
     c = zeros(SVector{N*D,T})
-    LinearDynamics(A,B,c)
+    LinearDynamics(A, B, c)
 end
 NIntegratorDynamics(N::Int, D::Int, ::Type{T} = Rational{Int}) where {T} = NIntegratorDynamics(Val(N), Val(D), T)
 DoubleIntegratorDynamics(D::Int, ::Type{T} = Rational{Int}) where {T} = NIntegratorDynamics(2, D, T)
@@ -61,7 +59,7 @@ function SteeringBVP(f::LinearDynamics{Dx,Du}, j::TimePlusQuadraticControl{Du};
                             SteeringBVP(f, j, EmptySteeringConstraints(), EmptySteeringCache())
 end
 
-## Ad-Hoc Steering
+## Ad Hoc Steering
 struct LinearQuadraticSteeringControl{Dx,Du,T,
                                       Tx0<:StaticVector{Dx},
                                       Txf<:StaticVector{Dx},
