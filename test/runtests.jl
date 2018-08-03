@@ -18,6 +18,13 @@ end
 
 Base.isapprox(x, y; atol=0) = all(isapprox(getfield(x, i), getfield(y, i), atol=atol) for i in 1:fieldcount(typeof(x)))
 
+DI = DoubleIntegratorDynamics(2)
+J  = TimePlusQuadraticControl(SMatrix{2,2,Rational{Int}}(I))
+@test_throws ErrorException SteeringBVP(DI, J, compile=Val(true))
+using SymPy
+bvp_compiled = SteeringBVP(DI, J, compile=Val(true))
+bvp_adhoc    = SteeringBVP(DI, J, compile=Val(false))
+
 for T in (Float32, Float64)
     # LinearDynamics vs. Ad Hoc Single Integrator (from DifferentialDynamicsModels)
     SI_linear = NIntegratorDynamics(1, 2)
@@ -56,16 +63,14 @@ for T in (Float32, Float64)
             @test linearize(dyn, x0, u_sc_or_rc, keep_state_dims=X, keep_control_dims=U) ≈
                   linearize(dyn_test, x0, u_sc_or_rc, keep_state_dims=X, keep_control_dims=U) atol=1e-3
         end
+        @test propagate(dyn, x0, sc) ≈ linearize(dyn, x0, sc)(x0, sc)
+        @test propagate(dyn, x0, rc) ≈ linearize(dyn, x0, rc)(x0, rc)
     end
 
     # Compiled vs Ad Hoc Steering
-    DI = DoubleIntegratorDynamics(2)
-    J  = TimePlusQuadraticControl(SMatrix{2,2,Rational{Int}}(I))
     x0 = rand(SVector{4,T})
     xf = rand(SVector{4,T})
 
-    bvp_compiled = SteeringBVP(DI, J, compile=Val(true))
-    bvp_adhoc    = SteeringBVP(DI, J, compile=Val(false))
     sol_compiled = bvp_compiled(x0, xf, 10.0)
     sol_adhoc    = bvp_adhoc(x0, xf, 10.0)
     @test sol_compiled.cost ≈ sol_adhoc.cost atol=1e-2
