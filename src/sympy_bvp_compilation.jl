@@ -69,7 +69,7 @@ function LinearQuadraticHelpers(A_::AbstractMatrix, B_::AbstractMatrix, c_::Abst
         "y" => y
     )
     for (k, v) in symbolic_exprs
-        symbolic_exprs[k] = collect.(expand.(v), t)
+        symbolic_exprs[k] = SymPy.collect.(SymPy.expand.(v), t)
     end
 
     symbol_dict = merge(Dict(Symbol("x$i") => :(x[$i]) for i in 1:Dx),
