@@ -1,4 +1,4 @@
-julia 0.7-beta
+julia 0.7
 StaticArrays 0.8.2
 DifferentialDynamicsModels
 ForwardDiff 0.8.0
