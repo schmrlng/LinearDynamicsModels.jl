@@ -100,7 +100,7 @@ function (bvp::SteeringBVP{D,C,EmptySteeringConstraints,EmptySteeringCache})(x0:
     f = bvp.dynamics
     j = bvp.cost
     A, B, c, R = f.A, f.B, f.c, j.R
-    x0 == xf && return (cost=T(0), controls=LinearQuadraticSteeringControl(T(0), x0, xf, A, B, c, R, zeros(typeof(c))))
+    x0 == xf && return (cost=T(0), controls=LinearQuadraticSteeringControl(T(0), x0, xf, A, B, c, R, zeros(similar_type(typeof(c), T))))
     t = optimal_time(bvp, x0, xf, c_max)
     Q = B*(R\B')
     G = integrate_expAt_B_expATt(A, Q, t)
