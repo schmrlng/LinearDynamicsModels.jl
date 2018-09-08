@@ -23,12 +23,8 @@ struct LinearQuadraticHelpers{FGinv<:Function,
     symbolic_exprs::Dict{String,Union{SymPy.Sym,Vector{SymPy.Sym},Matrix{SymPy.Sym}}}
 end
 
-function (bvp::SteeringBVP{D,C,EmptySteeringConstraints,<:LinearQuadraticHelpers})(x0::StaticVector{Dx},
-                                                                                   xf::StaticVector{Dx},
-                                                                                   c_max::T) where {Dx,Du,
-                                                                                                    T<:Number,
-                                                                                                    D<:LinearDynamics{Dx,Du},
-                                                                                                    C<:TimePlusQuadraticControl{Du}}
+function (bvp::LinearQuadraticSteering{Dx,Du,<:LinearQuadraticHelpers})(x0::StaticVector{Dx}, xf::StaticVector{Dx},
+                                                                        c_max::T=eltype(x0)(1e6)) where {Dx,Du,T<:Number}    # TODO: handle c_max == Inf
     x0 == xf && return (cost=T(0), controls=BVPControl(T(0), x0, xf, bvp.cache.x, bvp.cache.u))
     t = optimal_time(bvp, x0, xf, c_max)
     (cost=bvp.cache.cost(x0, xf, t), controls=BVPControl(t, x0, xf, bvp.cache.x, bvp.cache.u))

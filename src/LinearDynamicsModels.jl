@@ -11,6 +11,7 @@ import DifferentialDynamicsModels: SteeringBVP
 import DifferentialDynamicsModels: state_dim, control_dim, duration, propagate, instantaneous_control
 export LinearDynamics, ZeroOrderHoldLinearization, FirstOrderHoldLinearization, linearize
 export NIntegratorDynamics, DoubleIntegratorDynamics, TripleIntegratorDynamics
+export LinearQuadraticSteering, NIntegratorSteering, DoubleIntegratorSteering, TripleIntegratorSteering
 
 include("utils.jl")
 
@@ -58,6 +59,19 @@ function SteeringBVP(f::LinearDynamics{Dx,Du}, j::TimePlusQuadraticControl{Du};
     compile === Val(true) ? error("Run `using SymPy` to enable SteeringBVP compilation.") :
                             SteeringBVP(f, j, EmptySteeringConstraints(), EmptySteeringCache())
 end
+const LinearQuadraticSteering{Dx,Du,Cache} = SteeringBVP{<:LinearDynamics{Dx,Du},<:TimePlusQuadraticControl{Du},EmptySteeringConstraints,Cache}
+function LinearQuadraticSteering(A, B, c, R; compile::Union{Val{false},Val{true}}=Val(false))
+    SteeringBVP(LinearDynamics(A, B, c), TimePlusQuadraticControl(R), compile=compile)
+end
+function NIntegratorSteering(N::Int, D::Int, R=SMatrix{D,D,Rational{Int}}(I); compile::Union{Val{false},Val{true}}=Val(false))
+    SteeringBVP(NIntegratorDynamics(N, D), TimePlusQuadraticControl(R), compile=compile)
+end
+function DoubleIntegratorSteering(D::Int, R=SMatrix{D,D,Rational{Int}}(I); compile::Union{Val{false},Val{true}}=Val(false))
+    SteeringBVP(DoubleIntegratorDynamics(D), TimePlusQuadraticControl(R), compile=compile)
+end
+function TripleIntegratorSteering(D::Int, R=SMatrix{D,D,Rational{Int}}(I); compile::Union{Val{false},Val{true}}=Val(false))
+    SteeringBVP(TripleIntegratorDynamics(D), TimePlusQuadraticControl(R), compile=compile)
+end
 
 ## Ad Hoc Steering
 struct LinearQuadraticSteeringControl{Dx,Du,T,
@@ -91,12 +105,8 @@ function instantaneous_control(lqsc::LinearQuadraticSteeringControl, s::Number)
     (R\B')*(eᴬˢ'\z)
 end
 
-function (bvp::SteeringBVP{D,C,EmptySteeringConstraints,EmptySteeringCache})(x0::StaticVector{Dx},
-                                                                             xf::StaticVector{Dx},
-                                                                             c_max::T) where {Dx,Du,
-                                                                                              T<:Number,
-                                                                                              D<:LinearDynamics{Dx,Du},
-                                                                                              C<:TimePlusQuadraticControl{Du}}
+function (bvp::LinearQuadraticSteering{Dx,Du,EmptySteeringCache})(x0::StaticVector{Dx}, xf::StaticVector{Dx},
+                                                                  c_max::T=eltype(x0)(1e6)) where {Dx,Du,T<:Number}    # TODO: handle c_max == Inf
     f = bvp.dynamics
     j = bvp.cost
     A, B, c, R = f.A, f.B, f.c, j.R
