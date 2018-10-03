@@ -92,6 +92,9 @@ struct LinearQuadraticSteeringControl{Dx,Du,T,
     z::Tz
 end
 duration(lqsc::LinearQuadraticSteeringControl) = lqsc.t
+function Base.zero(::Type{LinearQuadraticSteeringControl{Dx,Du,T,Tx0,Txf,TA,TB,Tc,TR,Tz}}) where {Dx,Du,T,Tx0,Txf,TA,TB,Tc,TR,Tz}
+    LinearQuadraticSteeringControl(zero(T), zero(Tx0), zero(Txf), zero(TA), zero(TB), zero(Tc), zero(TR), zero(Tz))
+end
 propagate(f::LinearDynamics, x::State, lqsc::LinearQuadraticSteeringControl) = (x - lqsc.x0) + lqsc.xf
 function propagate(f::LinearDynamics, x::State, lqsc::LinearQuadraticSteeringControl, s::Number)
     x0, A, B, c, R, z = lqsc.x0, lqsc.A, lqsc.B, lqsc.c, lqsc.R, lqsc.z
