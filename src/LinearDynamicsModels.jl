@@ -56,7 +56,7 @@ TripleIntegratorDynamics(D::Int, ::Type{T} = Rational{Int}) where {T} = NIntegra
 # TimePlusQuadraticControl BVPs
 function SteeringBVP(f::LinearDynamics{Dx,Du}, j::TimePlusQuadraticControl{Du};
                      compile::Union{Val{false},Val{true}}=Val(false)) where {Dx,Du}
-    compile === Val(true) ? error("Run `using SymPy` to enable SteeringBVP compilation.") :
+    compile === Val(true) ? error("Run `import SymPy` to enable SteeringBVP compilation.") :
                             SteeringBVP(f, j, EmptySteeringConstraints(), EmptySteeringCache())
 end
 const LinearQuadraticSteering{Dx,Du,Cache} = SteeringBVP{<:LinearDynamics{Dx,Du},<:TimePlusQuadraticControl{Du},EmptySteeringConstraints,Cache}
@@ -152,7 +152,7 @@ function optimal_time(bvp::SteeringBVP{D,C,EmptySteeringConstraints,EmptySteerin
     t !== nothing ? t : golden_section(cost, t_max/100, t_max)
 end
 
-## Compiled Steering Functions (enabled by `using SymPy`; compiled `SteeringBVP`s return `BVPControl`s)
+## Compiled Steering Functions (enabled by `import SymPy`; compiled `SteeringBVP`s return `BVPControl`s)
 function __init__()
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" include("sympy_bvp_compilation.jl")
 end
