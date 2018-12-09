@@ -21,6 +21,7 @@ struct LinearDynamics{Dx,Du,TA<:StaticMatrix{Dx,Dx},TB<:StaticMatrix{Dx,Du},Tc<:
     B::TB
     c::Tc
 end
+Base.zero(::Type{LinearDynamics{Dx,Du,TA,TB,Tc}}) where {Dx,Du,TA,TB,Tc} = LinearDynamics(zero(TA), zero(TB), zero(Tc))
 
 state_dim(::LinearDynamics{Dx,Du}) where {Dx,Du} = Dx
 control_dim(::LinearDynamics{Dx,Du}) where {Dx,Du} = Du
@@ -77,50 +78,50 @@ end
 struct LinearQuadraticSteeringControl{Dx,Du,T,
                                       Tx0<:StaticVector{Dx},
                                       Txf<:StaticVector{Dx},
-                                      TA<:StaticMatrix{Dx,Dx},
-                                      TB<:StaticMatrix{Dx,Du},
-                                      Tc<:StaticVector{Dx},
-                                      TR<:StaticMatrix{Du,Du},
+                                      Tf<:LinearDynamics{Dx,Du},
+                                      Tj<:TimePlusQuadraticControl{Du},
                                       Tz<:StaticVector{Dx}} <: ControlInterval
     t::T
     x0::Tx0
     xf::Txf
-    A::TA
-    B::TB
-    c::Tc
-    R::TR
+    dynamics::Tf
+    cost::Tj
     z::Tz
 end
 duration(lqsc::LinearQuadraticSteeringControl) = lqsc.t
-function Base.zero(::Type{LinearQuadraticSteeringControl{Dx,Du,T,Tx0,Txf,TA,TB,Tc,TR,Tz}}) where {Dx,Du,T,Tx0,Txf,TA,TB,Tc,TR,Tz}
-    LinearQuadraticSteeringControl(zero(T), zero(Tx0), zero(Txf), zero(TA), zero(TB), zero(Tc), zero(TR), zero(Tz))
+function Base.zero(::Type{LinearQuadraticSteeringControl{Dx,Du,T,Tx0,Txf,Tf,Tj,Tz}}) where {Dx,Du,T,Tx0,Txf,Tf,Tj,Tz}
+    LinearQuadraticSteeringControl(zero(T), zero(Tx0), zero(Txf), zero(Tf), zero(Tj), zero(Tz))
 end
 propagate(f::LinearDynamics, x::State, lqsc::LinearQuadraticSteeringControl) = (x - lqsc.x0) + lqsc.xf
 function propagate(f::LinearDynamics, x::State, lqsc::LinearQuadraticSteeringControl, s::Number)
-    x0, A, B, c, R, z = lqsc.x0, lqsc.A, lqsc.B, lqsc.c, lqsc.R, lqsc.z
+    f, j = lqsc.dynamics, lqsc.cost
+    x0, A, B, c, R, z = lqsc.x0, f.A, f.B, f.c, j.R, lqsc.z
     eᴬˢ, ∫eᴬˢc = integrate_expAt_B(A, c, s)
     Gs = integrate_expAt_B_expATt(A, B*(R\B'), s)
     (x - x0) + eᴬˢ*x0 + ∫eᴬˢc + Gs*(eᴬˢ'\z)
 end
 function instantaneous_control(lqsc::LinearQuadraticSteeringControl, s::Number)
-    A, B, R, z = lqsc.A, lqsc.B, lqsc.R, lqsc.z
+    A, B, R, z = lqsc.dynamics.A, lqsc.dynamics.B, lqsc.cost.R, lqsc.z
     eᴬˢ = exp(A*s)
     (R\B')*(eᴬˢ'\z)
+end
+function (j::TimePlusQuadraticControl)(lqsc::LinearQuadraticSteeringControl)
+    @assert j == lqsc.cost
+    cost(lqsc.dynamics, lqsc.cost, lqsc.x0, lqsc.xf, lqsc.t)
 end
 
 function (bvp::LinearQuadraticSteering{Dx,Du,EmptySteeringCache})(x0::StaticVector{Dx}, xf::StaticVector{Dx},
                                                                   c_max::T=eltype(x0)(1e6)) where {Dx,Du,T<:Number}    # TODO: handle c_max == Inf
-    f = bvp.dynamics
-    j = bvp.cost
+    f, j = bvp.dynamics, bvp.cost
     A, B, c, R = f.A, f.B, f.c, j.R
-    x0 == xf && return (cost=T(0), controls=LinearQuadraticSteeringControl(T(0), x0, xf, A, B, c, R, zeros(similar_type(typeof(c), T))))
+    x0 == xf && return (cost=T(0), controls=LinearQuadraticSteeringControl(T(0), x0, xf, f, j, zeros(similar_type(typeof(c), T))))
     t = optimal_time(bvp, x0, xf, c_max)
     Q = B*(R\B')
     G = integrate_expAt_B_expATt(A, Q, t)
     eᴬᵗ, ∫eᴬᵗc = integrate_expAt_B(A, c, t)
     x̄ = eᴬᵗ*x0 + ∫eᴬᵗc
     z = eᴬᵗ'*(G\(xf - x̄))
-    (cost=cost(f, j, x0, xf, t), controls=LinearQuadraticSteeringControl(t, x0, xf, A, B, c, R, z))
+    (cost=cost(f, j, x0, xf, t), controls=LinearQuadraticSteeringControl(t, x0, xf, f, j, z))
 end
 
 function cost(f::LinearDynamics{Dx,Du}, j::TimePlusQuadraticControl{Du},
