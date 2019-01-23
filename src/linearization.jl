@@ -77,28 +77,38 @@ function linearize(f::LinearDynamics{Dx,Du}, x::StaticVector{Dx}, RC::RampContro
               keep_state_dims=keep_state_dims)
 end
 
-function linearize(f::DifferentialDynamics, x::State, u::Control;
+function linearize(f::DifferentialDynamics, x::State, u::Control; keep_state_dims=:, keep_control_dims=:)
+    linearize(f, SVector(x...), SVector(u...),
+              keep_state_dims=keep_state_dims, keep_control_dims=keep_control_dims)
+end
+function linearize(f::DifferentialDynamics, x::SVector, u::SVector;
                    keep_state_dims=:, keep_control_dims=:)
-    x isa StaticVector && (x = SVector(x))
-    u isa StaticVector && (u = SVector(u))
     A = ForwardDiff.jacobian(y -> f(y, u), x)    # TODO: incorporate state/control reduction before differentiating
     B = ForwardDiff.jacobian(w -> f(x, w), u)
     linearize(LinearDynamics(A, B, f(x,u) - A*x - B*u), x, u,
               keep_state_dims=keep_state_dims, keep_control_dims=keep_control_dims)
 end
+
 function linearize(f::DifferentialDynamics, x::StaticVector, SC::StepControl;
                    keep_state_dims=:, keep_control_dims=:)
-    x  = SVector(x)
-    SC = StepControl(SC.t, SVector(SC.u))
+    linearize(f, SVector(x), StepControl(SC.t, SVector(SC.u)),
+              keep_state_dims=keep_state_dims, keep_control_dims=keep_control_dims)
+end
+function linearize(f::DifferentialDynamics, x::SVector, SC::StepControl{<:Any,<:Any,<:SVector};
+                   keep_state_dims=:, keep_control_dims=:)
     A = ForwardDiff.jacobian(y -> propagate(f, y, SC), x)
     B = ForwardDiff.jacobian(w -> propagate(f, x, StepControl(SC.t, w)), SC.u)
     linearize(ZeroOrderHoldLinearization(SC.t, A, B, propagate(f, x, SC) - A*x - B*SC.u), x, SC,
               keep_state_dims=keep_state_dims, keep_control_dims=keep_control_dims)
 end
+
 function linearize(f::DifferentialDynamics, x::StaticVector, RC::RampControl;
                    keep_state_dims=:, keep_control_dims=:)
-    x  = SVector(x)
-    RC = RampControl(RC.t, SVector(RC.u0), SVector(RC.uf))
+    linearize(f, SVector(x), RampControl(RC.t, SVector(RC.u0), SVector(RC.uf)),
+              keep_state_dims=keep_state_dims, keep_control_dims=keep_control_dims)
+end
+function linearize(f::DifferentialDynamics, x::SVector, RC::RampControl{<:Any,<:Any,<:SVector,<:SVector};
+                   keep_state_dims=:, keep_control_dims=:)
     A  = ForwardDiff.jacobian(y -> propagate(f, y, RC), x)
     B0 = ForwardDiff.jacobian(w -> propagate(f, x, RampControl(RC.t, w, RC.uf)), RC.u0)
     Bf = ForwardDiff.jacobian(w -> propagate(f, x, RampControl(RC.t, RC.u0, w)), RC.uf)
