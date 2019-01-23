@@ -12,13 +12,16 @@ struct FirstOrderHoldLinearization{Dx,Du,T,TA<:SMatrix{Dx,Dx},TB0<:SMatrix{Dx,Du
     c::Tc
 end
 
-function linearize(f::LinearDynamics{Dx,Du}, x::StaticVector{Dx}, u::StaticVector{Du};
-                   keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
-    keep_state_dims === (:) && keep_control_dims === (:) && return f
-    X, U = keep_state_dims, keep_control_dims
-    Ã, B̃ = f.A[X,X], f.B[X,U]
-    f̃, x̃, ũ = f(x,u)[X], x[X], u[U]
-    LinearDynamics(Ã, B̃, f̃ - Ã*x̃ - B̃*ũ)
+for (Tx, Tu) in ((:(StaticVector{Dx}), :(StaticVector{Du})),    # needed to avoid method ambiguity
+                 (:(SVector{Dx}),      :(SVector{Du})))
+    @eval function linearize(f::LinearDynamics{Dx,Du}, x::$Tx, u::$Tu;
+                             keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
+        keep_state_dims === (:) && keep_control_dims === (:) && return f
+        X, U = keep_state_dims, keep_control_dims
+        Ã, B̃ = f.A[X,X], f.B[X,U]
+        f̃, x̃, ũ = f(x,u)[X], x[X], u[U]
+        LinearDynamics(Ã, B̃, f̃ - Ã*x̃ - B̃*ũ)
+    end
 end
 function linearize(f::ZeroOrderHoldLinearization{Dx,Du}, x::StaticVector{Dx}, SC::StepControl{Du};
                    keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
@@ -39,42 +42,48 @@ function linearize(f::FirstOrderHoldLinearization{Dx,Du}, x::StaticVector{Dx}, R
     FirstOrderHoldLinearization(f.dt, Ã, B̃0, B̃f, f̃ - Ã*x̃ - B̃0*ũ0 - B̃f*ũf)
 end
 
-function linearize(f::LinearDynamics{Dx,Du}, x::StaticVector{Dx}, SC::StepControl{Du};
-                   keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
-    X, U = keep_state_dims, keep_control_dims
-    B, u = f.B[:,U], SC.u[U]
-    eᴬᵗ, ∫eᴬᵗB = integrate_expAt_B(f.A, B, SC.t)
-    _  , ∫eᴬᵗc = integrate_expAt_B(f.A, f.B*SC.u - B*u + f.c, SC.t)
-    linearize(ZeroOrderHoldLinearization(SC.t, eᴬᵗ, ∫eᴬᵗB, ∫eᴬᵗc), x, StepControl(SC.t, u),
-              keep_state_dims=keep_state_dims)
-end
-function linearize(f::LinearDynamics{Dx,Du}, x::StaticVector{Dx}, RC::RampControl{Du};
-                   keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
-    if keep_control_dims === (:)
-        u0, uf = RC.u0, RC.uf
-        eᴬᵗ, ∫eᴬᵗB, ∫eᴬᵗBtdt⁻¹ = integrate_expAt_Bt_dtinv(f.A, f.B, RC.t)
-        _  , ∫eᴬᵗc = integrate_expAt_B(f.A, f.c, RC.t)
-        A  = eᴬᵗ
-        B0 = ∫eᴬᵗBtdt⁻¹
-        Bf = ∫eᴬᵗB - ∫eᴬᵗBtdt⁻¹
-        c  = ∫eᴬᵗc
-    else
+for (Tx, TSC) in ((:(StaticVector{Dx}), :(StepControl{Du})),    # needed to avoid method ambiguity
+                  (:(SVector{Dx}),      :(StepControl{Du,<:Any,<:SVector{Du}})))
+    @eval function linearize(f::LinearDynamics{Dx,Du}, x::$Tx, SC::$TSC;
+                             keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
         X, U = keep_state_dims, keep_control_dims
-        B, u0, uf = f.B[:,U], RC.u0[U], RC.uf[U]
-        b0 = f.B*RC.u0 - B*u0
-        bf = f.B*RC.uf - B*uf
-        B̂, û0, ûf = [B (bf - b0)], [u0; 0], [uf; 1]
-        eᴬᵗ, ∫eᴬᵗB̂, ∫eᴬᵗB̂tdt⁻¹ = integrate_expAt_Bt_dtinv(f.A, B̂, RC.t)
-        _  , ∫eᴬᵗc = integrate_expAt_B(f.A, f.c + b0, RC.t)
-        B̂0 = ∫eᴬᵗB̂tdt⁻¹
-        B̂f = ∫eᴬᵗB̂ - ∫eᴬᵗB̂tdt⁻¹
-        A  = eᴬᵗ
-        B0 = B̂0[:,SUnitRange(1,length(U))]
-        Bf = B̂f[:,SUnitRange(1,length(U))]
-        c  = ∫eᴬᵗc + B̂f[:,end]
+        B, u = f.B[:,U], SC.u[U]
+        eᴬᵗ, ∫eᴬᵗB = integrate_expAt_B(f.A, B, SC.t)
+        _  , ∫eᴬᵗc = integrate_expAt_B(f.A, f.B*SC.u - B*u + f.c, SC.t)
+        linearize(ZeroOrderHoldLinearization(SC.t, eᴬᵗ, ∫eᴬᵗB, ∫eᴬᵗc), x, StepControl(SC.t, u),
+                  keep_state_dims=keep_state_dims)
     end
-    linearize(FirstOrderHoldLinearization(RC.t, A, B0, Bf, c), x, RampControl(RC.t, u0, uf),
-              keep_state_dims=keep_state_dims)
+end
+for (Tx, TRC) in ((:(StaticVector{Dx}), :(RampControl{Du})),    # needed to avoid method ambiguity
+                  (:(SVector{Dx}),      :(RampControl{Du,<:Any,<:SVector{Du},<:SVector{Du}})))
+    @eval function linearize(f::LinearDynamics{Dx,Du}, x::$Tx, RC::$TRC;
+                             keep_state_dims=:, keep_control_dims=:) where {Dx,Du}
+        if keep_control_dims === (:)
+            u0, uf = RC.u0, RC.uf
+            eᴬᵗ, ∫eᴬᵗB, ∫eᴬᵗBtdt⁻¹ = integrate_expAt_Bt_dtinv(f.A, f.B, RC.t)
+            _  , ∫eᴬᵗc = integrate_expAt_B(f.A, f.c, RC.t)
+            A  = eᴬᵗ
+            B0 = ∫eᴬᵗBtdt⁻¹
+            Bf = ∫eᴬᵗB - ∫eᴬᵗBtdt⁻¹
+            c  = ∫eᴬᵗc
+        else
+            X, U = keep_state_dims, keep_control_dims
+            B, u0, uf = f.B[:,U], RC.u0[U], RC.uf[U]
+            b0 = f.B*RC.u0 - B*u0
+            bf = f.B*RC.uf - B*uf
+            B̂, û0, ûf = [B (bf - b0)], [u0; 0], [uf; 1]
+            eᴬᵗ, ∫eᴬᵗB̂, ∫eᴬᵗB̂tdt⁻¹ = integrate_expAt_Bt_dtinv(f.A, B̂, RC.t)
+            _  , ∫eᴬᵗc = integrate_expAt_B(f.A, f.c + b0, RC.t)
+            B̂0 = ∫eᴬᵗB̂tdt⁻¹
+            B̂f = ∫eᴬᵗB̂ - ∫eᴬᵗB̂tdt⁻¹
+            A  = eᴬᵗ
+            B0 = B̂0[:,SUnitRange(1,length(U))]
+            Bf = B̂f[:,SUnitRange(1,length(U))]
+            c  = ∫eᴬᵗc + B̂f[:,end]
+        end
+        linearize(FirstOrderHoldLinearization(RC.t, A, B0, Bf, c), x, RampControl(RC.t, u0, uf),
+                  keep_state_dims=keep_state_dims)
+    end
 end
 
 function linearize(f::DifferentialDynamics, x::State, u::Control; keep_state_dims=:, keep_control_dims=:)
