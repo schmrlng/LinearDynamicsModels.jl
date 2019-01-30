@@ -1,7 +1,7 @@
 name = "LinearDynamicsModels"
 uuid = "93c30095-2a61-55f3-920e-6649674b8a9e"
 authors = ["Ed Schmerling <ednerd@gmail.com>"]
-version = "0.2.0"
+version = "1.0.0"
 
 [deps]
 DifferentialDynamicsModels = "cb52cc87-d0c7-5933-bad1-08679d8b4c67"
