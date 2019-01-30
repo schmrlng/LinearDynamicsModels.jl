@@ -29,7 +29,6 @@ install:
 
 build_script:
   - echo "%JL_BUILD_SCRIPT%"
-  - C:\julia\bin\julia -e "import Pkg; Pkg.clone(\"https://github.com/schmrlng/DifferentialDynamicsModels.jl.git\")"
   - C:\julia\bin\julia -e "%JL_BUILD_SCRIPT%"
 
 test_script:

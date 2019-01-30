@@ -15,7 +15,5 @@ notifications:
 env:
   global:
     - PYTHON=conda
-before_script:
-  - julia --project -e 'import Pkg; Pkg.clone("https://github.com/schmrlng/DifferentialDynamicsModels.jl.git")'
 after_success:
   - julia --project -e 'import Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
