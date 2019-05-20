@@ -37,18 +37,18 @@ function LinearQuadraticHelpers(A_::AbstractMatrix, B_::AbstractMatrix, c_::Abst
     x = collect(SymPy.symbols(join(("x$i" for i in 1:Dx), " "), real=true))
     y = collect(SymPy.symbols(join(("y$i" for i in 1:Dx), " "), real=true))
 
-    expAt = exp(A*t)
-    expAs = exp(A*s)
-    expAt_s = exp(A*(t - s))
-    G = SymPy.integrate(expAt*B*inv(R)*B'*expAt', t)
+    expAt = (A*t).exp()
+    expAs = (A*s).exp()
+    expAt_s = (A*(t - s)).exp()
+    G = SymPy.integrate.(expAt*B*inv(R)*B'*expAt', t)
     Ginv = inv(G)
-    cdrift = SymPy.integrate(expAt, t)*c
+    cdrift = SymPy.integrate.(expAt, t)*c
     xbar = expAt*x + cdrift
     cost = t + (y - xbar)'*Ginv*(y - xbar)
     dcost = diff(cost, t)
     ddcost = diff(cost, t, 2)
-    x_s = expAs*x + SymPy.integrate(expAs, s)*c + SymPy.integrate(expAs*B*inv(R)*B'*expAs', s)*expAt_s'*Ginv*(y-xbar)
-    u_s = inv(R)*B'*expAt_s'*Ginv*(y-xbar)
+    x_s = expAs*x + SymPy.integrate.(expAs, s)*c + SymPy.integrate.(expAs*B*inv(R)*B'*expAs', s)*expAt_s'*Ginv*(y-xbar)
+    u_s = inv(R)*B'*expAt_s.transpose()*Ginv*(y-xbar)  # transpose needed here (and technically above) to avoid `Any`s
 
     symbolic_exprs = Dict{String,Union{SymPy.Sym,Vector{SymPy.Sym},Matrix{SymPy.Sym}}}(
         "Ginv" => Ginv,
@@ -92,7 +92,7 @@ function sympy2code(x, symbol_dict = Dict())
                            ".-" => " .-",
                            ".*" => " .*",
                            "./" => " ./",
-                           ".^" => " .^"); init=SymPy.sympy_meth(:julia_code, x))    # TODO: sympy upstream PR
+                           ".^" => " .^"); init=SymPy.sympy.julia_code(x))
     expr = Meta.parse(code)
     MacroTools.postwalk(x -> x isa AbstractFloat ? :(T($x)) : get(symbol_dict, x, x), expr)
 end
